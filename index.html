@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>DStat Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white font-sans p-6">
+  <h1 class="text-3xl font-bold mb-6 text-cyan-400">DStat - Attack Monitoring Dashboard</h1>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-gray-800 p-6 rounded-lg shadow">
+      <h2 class="text-xl mb-2">Total IPs</h2>
+      <p id="ips" class="text-4xl font-bold text-green-400">0</p>
+    </div>
+    <div class="bg-gray-800 p-6 rounded-lg shadow">
+      <h2 class="text-xl mb-2">Total Requests</h2>
+      <p id="requests" class="text-4xl font-bold text-yellow-400">0</p>
+    </div>
+    <div class="bg-gray-800 p-6 rounded-lg shadow">
+      <h2 class="text-xl mb-2">Total Requests All</h2>
+      <p id="totalRequestsAll" class="text-4xl font-bold text-blue-400">0</p>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <div class="bg-gray-800 p-4 rounded-lg shadow">
+      <h3 class="text-lg mb-2">Requests Over Time</h3>
+      <canvas id="requestsChart" height="200"></canvas>
+    </div>
+    <div class="bg-gray-800 p-4 rounded-lg shadow">
+      <h3 class="text-lg mb-2">Methods Used</h3>
+      <canvas id="methodsChart" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Attack Table -->
+  <div class="bg-gray-800 p-6 rounded-lg shadow">
+    <h3 class="text-lg mb-4">Active Attacks</h3>
+    <table class="w-full text-sm">
+      <thead class="text-cyan-400 border-b border-gray-600">
+        <tr>
+          <th class="text-left py-2">IP</th>
+          <th class="text-left py-2">Method</th>
+        </tr>
+      </thead>
+      <tbody id="attackTable" class="text-white"></tbody>
+    </table>
+  </div>
+
+  <script>
+    let requests = 0;
+    const methodsData = { "HTTP": 0, "HTTP DDoS": 0, "Bypass": 0, "Blocked": 0 };
+
+    const requestsChart = new Chart(document.getElementById('requestsChart'), {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Requests',
+          data: [],
+          borderColor: '#34d399',
+          backgroundColor: 'rgba(52, 211, 153, 0.2)',
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: { scales: { y: { beginAtZero: true } } }
+    });
+
+    const methodsChart = new Chart(document.getElementById('methodsChart'), {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(methodsData),
+        datasets: [{
+          data: Object.values(methodsData),
+          backgroundColor: ['#3b82f6', '#f43f5e', '#f59e0b', '#6366f1']
+        }]
+      },
+      options: { plugins: { legend: { labels: { color: 'white' } } } }
+    });
+
+    async function updateRealIPs() {
+      try {
+        const res = await fetch('get_attacks.php');
+        const data = await res.json();
+        document.getElementById('ips').textContent = data.length;
+
+        const tbody = document.getElementById('attackTable');
+        tbody.innerHTML = "";
+        data.slice(-6).reverse().forEach(entry => {
+          tbody.innerHTML += `<tr class="border-b border-gray-700"><td class="py-2">${entry.ip}</td><td class="py-2">${entry.method}</td></tr>`;
+        });
+
+        const countMap = { "HTTP": 0, "HTTP DDoS": 0, "Bypass": 0, "Blocked": 0 };
+        data.forEach(entry => countMap[entry.method] = (countMap[entry.method] || 0) + 1);
+        Object.keys(countMap).forEach(key => methodsData[key] = countMap[key]);
+
+        methodsChart.data.datasets[0].data = Object.values(methodsData);
+        methodsChart.update();
+
+      } catch (err) {
+        console.error('Error loading real IPs:', err);
+      }
+    }
+
+    async function updateRealRequests() {
+      try {
+        const res = await fetch('counter.php');
+        const count = await res.text();
+        document.getElementById('totalRequestsAll').textContent = count;
+
+        requests += Math.floor(Math.random() * 500);
+        document.getElementById('requests').textContent = requests;
+
+        const now = new Date().toLocaleTimeString();
+        requestsChart.data.labels.push(now);
+        requestsChart.data.datasets[0].data.push(requests);
+        if (requestsChart.data.labels.length > 10) {
+          requestsChart.data.labels.shift();
+          requestsChart.data.datasets[0].data.shift();
+        }
+        requestsChart.update();
+
+      } catch (err) {
+        console.error('Error fetching real request count:', err);
+      }
+    }
+
+    updateRealRequests();
+    setInterval(updateRealRequests, 5000);
+    updateRealIPs();
+    setInterval(updateRealIPs, 3000);
+  </script>
+</body>
+</html>
