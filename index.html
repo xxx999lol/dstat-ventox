@@ -52,8 +52,8 @@
   </div>
 
   <script>
-    let requests = 0;
     const methodsData = { "HTTP": 0, "HTTP DDoS": 0, "Bypass": 0, "Blocked": 0 };
+    let requests = 0;
 
     const requestsChart = new Chart(document.getElementById('requestsChart'), {
       type: 'line',
@@ -83,37 +83,32 @@
       options: { plugins: { legend: { labels: { color: 'white' } } } }
     });
 
-    async function updateRealIPs() {
+    async function updateData() {
       try {
-        const res = await fetch('get_attacks.php');
-        const data = await res.json();
-        document.getElementById('ips').textContent = data.length;
+        // Load attack data từ file JSON tĩnh
+        const ipRes = await fetch('ips.json');
+        const ipData = await ipRes.json();
+        document.getElementById('ips').textContent = ipData.length;
 
         const tbody = document.getElementById('attackTable');
         tbody.innerHTML = "";
-        data.slice(-6).reverse().forEach(entry => {
+        const countMap = { "HTTP": 0, "HTTP DDoS": 0, "Bypass": 0, "Blocked": 0 };
+
+        ipData.slice(-6).reverse().forEach(entry => {
           tbody.innerHTML += `<tr class="border-b border-gray-700"><td class="py-2">${entry.ip}</td><td class="py-2">${entry.method}</td></tr>`;
+          if (countMap[entry.method] !== undefined) countMap[entry.method]++;
         });
 
-        const countMap = { "HTTP": 0, "HTTP DDoS": 0, "Bypass": 0, "Blocked": 0 };
-        data.forEach(entry => countMap[entry.method] = (countMap[entry.method] || 0) + 1);
-        Object.keys(countMap).forEach(key => methodsData[key] = countMap[key]);
-
+        Object.keys(methodsData).forEach(k => methodsData[k] = countMap[k]);
         methodsChart.data.datasets[0].data = Object.values(methodsData);
         methodsChart.update();
 
-      } catch (err) {
-        console.error('Error loading real IPs:', err);
-      }
-    }
+        // Load requests count từ JSON
+        const reqRes = await fetch('counter.json');
+        const reqCount = await reqRes.json();
+        document.getElementById('totalRequestsAll').textContent = reqCount.total;
 
-    async function updateRealRequests() {
-      try {
-        const res = await fetch('counter.php');
-        const count = await res.text();
-        document.getElementById('totalRequestsAll').textContent = count;
-
-        requests += Math.floor(Math.random() * 500);
+        requests += Math.floor(Math.random() * 300); // giả lập tăng
         document.getElementById('requests').textContent = requests;
 
         const now = new Date().toLocaleTimeString();
@@ -126,14 +121,12 @@
         requestsChart.update();
 
       } catch (err) {
-        console.error('Error fetching real request count:', err);
+        console.error("Lỗi khi tải dữ liệu JSON:", err);
       }
     }
 
-    updateRealRequests();
-    setInterval(updateRealRequests, 5000);
-    updateRealIPs();
-    setInterval(updateRealIPs, 3000);
+    updateData();
+    setInterval(updateData, 5000);
   </script>
 </body>
 </html>
